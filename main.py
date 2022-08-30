@@ -3,9 +3,9 @@ import os
 import numpy as np
 from skimage import io
 from skimage.color import rgb2ycbcr,ycbcr2rgb,rgb2gray
+from skimage.transform import resize
 import pickle
 from sklearn.preprocessing import normalize
-from tqdm import tqdm
 # %%
 # choose parameters
 class args(object):
@@ -36,7 +36,7 @@ dict_name = str(para.dic_size) + '_US' + str(para.dic_upscale_factor) + '_L' + s
 
 with open('dictionary/Dh_' + dict_name + '.pkl', 'rb') as f:
     Dh = pickle.load(f)
-Dh = normalize(Dh)
+Dh = normalize(Dh) #? normalize?
 with open('dictionary/Dl_' + dict_name + '.pkl', 'rb') as f:
     Dl = pickle.load(f)
 Dl = normalize(Dl)
@@ -47,7 +47,7 @@ if not os.path.exists(para.sr_dir):
 # %%
 img_lr_file = os.listdir(para.lr_dir)
 # %%
-for i in tqdm(range(len(img_lr_file))):
+for i in range(len(img_lr_file)):
     img_name = img_lr_file[i]
     img_lr = io.imread(f"{para.lr_dir}/{img_name}")
     img_hr = io.imread(f"{para.hr_dir}/{img_name}")
@@ -56,5 +56,40 @@ for i in tqdm(range(len(img_lr_file))):
         img_hr_y = rgb2ycbcr(img_hr)[:,:,0]
         
         # change color space
+        img_lr_ycbcr = rgb2ycbcr(img_lr)
+        img_lr_y = img_lr_ycbcr[:,:,0]
+        img_lr_cb = img_lr_ycbcr[:,:,1]
+        img_lr_cr = img_lr_ycbcr[:,:,2]
         
-# %%
+        # upscale chrominance to color SR images
+        # nearest neighbor interpolation
+        img_sr_cb = resize(img_lr_cb, (img_hr.shape[0], img_hr.shape[1]), order=0)
+        img_sr_cr = resize(img_lr_cr, (img_hr.shape[0], img_hr.shape[1]), order=0)
+        
+    elif para.color_space == 'bw':
+        img_hr_y = rgb2gray(img_hr)
+        img_lr_y = rgb2gray(img_lr)
+    
+    else:
+        raise ValueError("Invalid color space!")
+        
+    # super resolution via sparse representation
+    # TODO ScSR, backprojection
+    img_sr_y = ScSR(img_lr_y, img_hr_y.shape, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap)
+    img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration)
+    
+    # reconstructed color images
+    if para.color_space == 'ycbcr':
+        img_sr = np.stack((img_sr_y, img_sr_cb, img_sr_cr), axis=2)
+        img_sr = ycbcr2rgb(img_sr)
+        
+    elif para.color_space == 'bw':
+        img_sr = img_sr_y
+        
+    else:
+        raise ValueError("Invalid color space!")
+    
+    # signal normalization
+       
+    # maximum pixel intensity normalization
+    
