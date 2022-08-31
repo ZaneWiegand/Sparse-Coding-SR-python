@@ -4,8 +4,11 @@ import numpy as np
 from skimage import io
 from skimage.color import rgb2ycbcr,ycbcr2rgb,rgb2gray
 from skimage.transform import resize
+from skimage.metrics import peak_signal_noise_ratio, structural_similarity, mean_squared_error
+from utils import noise_quality_measure
+
+from utils import ScSR
 import pickle
-from sklearn.preprocessing import normalize
 # %%
 # choose parameters
 class args(object):
@@ -19,7 +22,7 @@ class args(object):
     dic_size = 1024
     dic_patch_size = 3
     
-    # Sparse SR factor
+    # sparse SR factor
     lambda_factor = 0.3
     overlap = 1
     upscale_factor = 2
@@ -36,10 +39,8 @@ dict_name = str(para.dic_size) + '_US' + str(para.dic_upscale_factor) + '_L' + s
 
 with open('dictionary/Dh_' + dict_name + '.pkl', 'rb') as f:
     Dh = pickle.load(f)
-Dh = normalize(Dh) #? normalize?
 with open('dictionary/Dl_' + dict_name + '.pkl', 'rb') as f:
     Dl = pickle.load(f)
-Dl = normalize(Dl)
 # %%
 # super resolution img dir
 if not os.path.exists(para.sr_dir):
@@ -75,7 +76,7 @@ for i in range(len(img_lr_file)):
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    img_sr_y = ScSR(img_lr_y, img_hr_y.shape, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap)
+    img_sr_y = ScSR(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap)
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration)
     
     # reconstructed color images
@@ -88,8 +89,32 @@ for i in range(len(img_lr_file)):
         
     else:
         raise ValueError("Invalid color space!")
-    
+
     # signal normalization
-       
-    # maximum pixel intensity normalization
+    for channel in range(img_sr.shape[2]):
+        ratio = np.mean(img_lr[:, :, channel]) / (np.mean(img_sr[:, :, channel]) * 255)
+        img_sr[:, :, channel] = img_sr[:, :, channel] * ratio
+
+    # pixel intensity normalization
+    img_sr = img_sr.clip(0,1)*255
+    img_sr = img_sr.astype(np.uint8)
+    
+    # bicubic interpolation for reference
+    img_bc = resize(img_lr,(img_hr.shape[0],img_hr.shape[1])).clip(0,1)*255
+    img_bc = img_bc.astype(np.uint8)
+    
+    img_bc_y = rgb2ycbcr(img_bc)[:, :, 0]
+    
+    # calculate PSNR, SSIM and MSE for the luminance
+    # for bicubic interpolation
+    psnr_bc_hr = peak_signal_noise_ratio(img_hr_y,img_bc_y)
+    ssim_bc_hr = structural_similarity(img_hr_y,img_bc_y)
+    mse_bc_hr = mean_squared_error(img_hr_y,img_bc_y)
+    nqm_bc_hr = noise_quality_measure(img_hr_y,img_bc_y)
+    # for sparse representation SR
+    psnr_sr_hr = peak_signal_noise_ratio(img_hr_y,img_sr_y)
+    ssim_sr_hr = structural_similarity(img_hr_y,img_sr_y)
+    mse_sr_hr = mean_squared_error(img_hr_y,img_sr_y)
+    nqm_sr_hr = noise_quality_measure(img_hr_y,img_sr_y)
+    
     
