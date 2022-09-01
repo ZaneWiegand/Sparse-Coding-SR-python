@@ -1,5 +1,4 @@
 # %%
-from cmath import nan
 from copy import deepcopy
 import numpy as np
 from numpy.fft import fftshift, fft2, ifft2
@@ -173,8 +172,6 @@ def sparse_solution(lmbd, A, b):
 
     eps = 1e-9
     
-    
-    return nan
 
 def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
     # sparse coding super resolution
