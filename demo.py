@@ -66,3 +66,37 @@ A
 # %%
 A.T
 # %%
+def gauss2D(size,sigma):
+    x, y = np.mgrid[-size/2 + 0.5:size/2 + 0.5, -size/2 + 0.5:size/2 + 0.5]
+    z = np.exp(-(x*x+y*y)/(2*sigma**2))/(2*np.pi*sigma)
+    z = z/np.sum(z)
+    return z
+# %%
+A = gauss2D(5,1)
+# %%
+A = gauss2D(6,1)
+# %%
+A
+# %%
+aa = 2
+# %%
+b = aa
+# %%
+b
+# %%
+aa = 3
+# %%
+b
+# %%
+A = np.array([[1,1,1,1,0],[0,0,1,1,1],[0,1,1,1,0],[1,1,1,1,1],[0,0,0,1,1]])
+# %%
+A
+# %%
+idx = np.where(A < 1)
+# %%
+idx
+# %%
+A[idx] = 2
+# %%
+A
+# %%

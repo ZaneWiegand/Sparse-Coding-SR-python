@@ -1,4 +1,5 @@
 # %%
+from cmath import nan
 from copy import deepcopy
 import numpy as np
 from numpy.fft import fftshift, fft2, ifft2
@@ -158,8 +159,24 @@ def extract_feature(img):
     
     return img_feature
 
+def lin_scale(h_img, l_norm):
+    h_norm = np.sqrt(np.sum(h_img*h_img))
+    if h_norm>0:
+        s = l_norm/h_norm #? s = 1.2*l_norm/h_norm
+        h_img = h_img*s
+    return h_img
 
-def ScSR(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
+# todo
+def sparse_solution(lmbd, A, b):
+    A = A.astype(np.float64)
+    b = b.astype(np.float64)
+
+    eps = 1e-9
+    
+    
+    return nan
+
+def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
     # sparse coding super resolution
     
     # normalize the dictionary
@@ -193,6 +210,7 @@ def ScSR(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
             
             patch = img_lr_y_upscale[yy:yy+patch_size, xx:xx+patch_size]
             patch_mean = np.mean(patch)
+            patch = np.ravel(patch) - patch_mean
             patch_norm = np.sqrt(np.sum(patch*patch))
             
             feature = img_lr_y_feature[yy:yy+patch_size, xx:xx+patch_size, :]
@@ -211,17 +229,45 @@ def ScSR(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
             
             # generate hr patch and scale the contrast
             h_patch = np.dot(Dh,w)
-            h_patch = lin_scale(h_patch, feature_norm)
+            h_patch = lin_scale(h_patch, patch_norm)
             h_patch = np.reshape(h_patch,[patch_size,patch_size])
             h_patch = h_patch+patch_mean
             
             img_sr_y[yy:yy+patch_size, xx:xx+patch_size] = img_sr_y[yy:yy+patch_size, xx:xx+patch_size] + h_patch
             cnt_matrix[yy:yy+patch_size, xx:xx+patch_size] = cnt_matrix[yy:yy+patch_size, xx:xx+patch_size] + 1
 
-    idx = np.where(cnt_matrix < 1)[0]
+    idx = np.where(cnt_matrix < 1)
     img_sr_y[idx] = img_lr_y_upscale[idx]
 
     cnt_matrix[idx] = 1
     img_sr_y = img_sr_y/cnt_matrix
     
     return img_sr_y.astype(np.uint8)
+
+# %%
+def gauss2D(size,sigma):
+    x, y = np.mgrid[-size/2 + 0.5:size/2 + 0.5, -size/2 + 0.5:size/2 + 0.5]
+    z = np.exp(-(x*x+y*y)/(2*sigma**2))/(2*np.pi*sigma)
+    z = z/np.sum(z)
+    return z
+
+def backprojection(sr, lr, iters, nu, c):
+    p = gauss2D(5,1)
+    p = p*p
+    p = p/np.sum(p)
+    
+    sr = sr.astype(np.float64)
+    lr = lr.astype(np.float64)
+    sr_0 = sr
+    
+    for i in range(iters):
+        sr_blur = convolve2d(sr, p, 'same')
+        sr_downscale = resize(sr_blur, lr.shape, 'bicubic')
+        diff = lr - sr_downscale
+
+        diff_upscale = resize(diff, sr.shape, 'bicubic')
+        diff_blur = convolve2d(diff_upscale, p, 'same')
+        
+        sr = sr + nu*(diff_blur + c*(sr_0-sr))
+        
+    return sr

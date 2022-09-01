@@ -7,7 +7,7 @@ from skimage.transform import resize
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity, mean_squared_error
 from utils import noise_quality_measure
 
-from utils import ScSR
+from utils import scsr,backprojection
 import pickle
 # %%
 # choose parameters
@@ -24,9 +24,11 @@ class args(object):
     
     # sparse SR factor
     lambda_factor = 0.3
-    overlap = 1
+    overlap = 2
     upscale_factor = 2
     max_iteration = 1000
+    nu = 1
+    beta = 1 # also c/gamma in paper
     color_space = 'ycbcr' # 'bw'
     
     # True for validation, False for prediction
@@ -76,8 +78,8 @@ for i in range(len(img_lr_file)):
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    img_sr_y = ScSR(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap)
-    img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration)
+    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap)
+    img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
     
     # reconstructed color images
     if para.color_space == 'ycbcr':
