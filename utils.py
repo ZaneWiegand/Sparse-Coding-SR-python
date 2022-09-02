@@ -174,7 +174,8 @@ def sparse_solution(lmbd, A, b):
     grad = np.dot(A,x)+b
     ma = np.max(np.abs(grad))
     mi = np.argmax(np.abs(grad))
-    
+    cnt_1 = 0
+    cnt_2 = 0
     while True:
         if grad[mi]>lmbd+eps:
             x[mi] = (lmbd-grad[mi])/A[mi,mi]
@@ -199,9 +200,12 @@ def sparse_solution(lmbd, A, b):
             o_new = np.dot((vect[idx] / 2 + ba[idx]).T, x_new[idx]) + lmbd * np.sum(np.abs(x_new[idx]))
             
             # cost based on changing sign
-            s = np.where(np.multiply(xa, x_new) < 0)[0]
-            if np.all(s == 0):
+            s = np.where(xa*x_new <= 0)[0]
+            
+            cnt_2 += 1
+            if np.all(s == 0) or cnt_2>=10:
                 x[a] = x_new
+                cnt_2 = 0
                 break
             x_min = x_new
             o_min = o_new
@@ -211,8 +215,8 @@ def sparse_solution(lmbd, A, b):
             for zd in s.T:
                 x_s = xa - d / t[zd]
                 x_s[zd] = 0
-                idx = np.where(x_s == 0)[0]
-                o_s = np.dot((np.dot(Aa[idx, idx], x_s[idx]) / 2 + ba[idx]).T, x_s[idx]) + lmbd * np.sum(abs(x_s[idx]))
+                idx = np.where(x_s != 0)[0]
+                o_s = np.dot((np.dot(Aa[idx, idx], x_s[idx]) / 2 + ba[idx]).T, x_s[idx]) + lmbd * np.sum(np.abs(x_s[idx]))
                 if o_s < o_min:
                     x_min = x_s
                     o_min = o_s
@@ -224,8 +228,9 @@ def sparse_solution(lmbd, A, b):
         temp = np.abs(grad)*(x == 0)
         ma = np.max(np.abs(temp))
         mi = np.argmax(np.abs(temp))
-            
-        if ma<=lmbd+eps:
+        
+        cnt_1 += 1
+        if ma<=lmbd+eps or cnt_1>=10:
             break
     return x
 
@@ -238,7 +243,7 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
     
     
     # bicubic interpolation of the lr image
-    img_lr_y_upscale = imresize(img_lr_y, upscale_factor,'bicubic')
+    img_lr_y_upscale = np.round(imresize(img_lr_y, upscale_factor,'bicubic'))
     # img_lr_y_upscale = img_lr_y_upscale.
     
     img_sr_y_height,img_sr_y_width = img_lr_y_upscale.shape

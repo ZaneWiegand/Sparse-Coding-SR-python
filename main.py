@@ -24,7 +24,7 @@ class args(object):
     dic_patch_size = 3
     
     # sparse SR factor
-    lambda_factor = 0.4
+    lambda_factor = 0.2
     overlap = 4
     upscale_factor = 2
     max_iteration = 100
