@@ -2,10 +2,10 @@
 from copy import deepcopy
 import numpy as np
 from numpy.fft import fftshift, fft2, ifft2
-from skimage.transform import resize
 from sklearn.preprocessing import normalize
 from scipy.signal import convolve2d
 from tqdm import tqdm
+from imresize import imresize
 # %%
 
 def noise_quality_measure(hr, sr, VA=np.pi/3):
@@ -56,8 +56,8 @@ def noise_quality_measure(hr, sr, VA=np.pi/3):
     GS_4 = fftshift(G_4)
     GS_5 = fftshift(G_5)
 
-    FO = fft2(sr)
-    FI = fft2(hr)
+    FO = fft2(sr).T
+    FI = fft2(hr).T
 
     L_0 = GS_0*FO
     LI_0 = GS_0*FI
@@ -146,12 +146,12 @@ def extract_feature(img):
     img_feature = np.zeros([row, col, 4])
     
     # first order gradient filters
-    hf1 = np.array([[-1, 0, 1], ] * 3)
+    hf1 = np.array([[-1, 0, 1]])
     vf1 = hf1.T
     img_feature[:,:,0] = convolve2d(img, hf1, 'same')
     img_feature[:,:,1] = convolve2d(img, vf1, 'same')
     
-    hf2 = np.array([[1, 0, -2, 0, 1], ] * 5)
+    hf2 = np.array([[1, 0, -2, 0, 1]])
     vf2 = hf2.T
     img_feature[:,:,2] = convolve2d(img, hf2, 'same')
     img_feature[:,:,3] = convolve2d(img, vf2, 'same')
@@ -161,17 +161,73 @@ def extract_feature(img):
 def lin_scale(h_img, l_norm):
     h_norm = np.sqrt(np.sum(h_img*h_img))
     if h_norm>0:
-        s = l_norm/h_norm #? s = 1.2*l_norm/h_norm
+        s = 1.2*l_norm/h_norm #? s = 1.2*l_norm/h_norm
         h_img = h_img*s
     return h_img
 
 # todo
 def sparse_solution(lmbd, A, b):
-    A = A.astype(np.float64)
-    b = b.astype(np.float64)
-
-    eps = 1e-9
     
+    eps = 1e-9
+    x = np.zeros((A.shape[0], 1))
+    
+    grad = np.dot(A,x)+b
+    ma = np.max(np.abs(grad))
+    mi = np.argmax(np.abs(grad))
+    
+    while True:
+        if grad[mi]>lmbd+eps:
+            x[mi] = (lmbd-grad[mi])/A[mi,mi]
+        elif grad[mi]<-lmbd-eps:
+            x[mi] = (-lmbd-grad[mi])/A[mi,mi]
+        else:
+            if np.all(x == 0):
+                break
+        while True:
+            a = np.where(x != 0)[0] # active set
+            Aa = A[np.repeat(a,len(a)),np.tile(a,len(a))].reshape(len(a),len(a))
+            ba = b[a]
+            xa = x[a]
+            
+            # new b based on unchanged sign
+            vect = -lmbd*np.sign(xa)-ba
+            if Aa.shape[0]==1:
+                x_new = vect/Aa
+            else:
+                x_new = np.dot(np.linalg.inv(Aa),vect)
+            idx = np.where(x_new != 0)[0]
+            o_new = np.dot((vect[idx] / 2 + ba[idx]).T, x_new[idx]) + lmbd * np.sum(np.abs(x_new[idx]))
+            
+            # cost based on changing sign
+            s = np.where(np.multiply(xa, x_new) < 0)[0]
+            if np.all(s == 0):
+                x[a] = x_new
+                break
+            x_min = x_new
+            o_min = o_new
+            d = x_new - xa
+            
+            t = d/xa
+            for zd in s.T:
+                x_s = xa - d / t[zd]
+                x_s[zd] = 0
+                idx = np.where(x_s == 0)[0]
+                o_s = np.dot((np.dot(Aa[idx, idx], x_s[idx]) / 2 + ba[idx]).T, x_s[idx]) + lmbd * np.sum(abs(x_s[idx]))
+                if o_s < o_min:
+                    x_min = x_s
+                    o_min = o_s
+            
+            x[a] = x_min
+            
+        grad = np.dot(A, x) + b
+            
+        temp = np.abs(grad)*(x == 0)
+        ma = np.max(np.abs(temp))
+        mi = np.argmax(np.abs(temp))
+            
+        if ma<=lmbd+eps:
+            break
+    return x
 
 def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
     # sparse coding super resolution
@@ -180,8 +236,10 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
     Dl = normalize(Dl,axis=0) #? normalize?
     patch_size = int(np.sqrt(Dh.shape[0]))
     
+    
     # bicubic interpolation of the lr image
-    img_lr_y_upscale = resize(img_lr_y,np.multiply(upscale_factor,img_lr_y.shape))
+    img_lr_y_upscale = imresize(img_lr_y, upscale_factor,'bicubic')
+    # img_lr_y_upscale = img_lr_y_upscale.
     
     img_sr_y_height,img_sr_y_width = img_lr_y_upscale.shape
     img_sr_y = np.zeros(img_lr_y_upscale.shape)
@@ -207,11 +265,11 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
             
             patch = img_lr_y_upscale[yy:yy+patch_size, xx:xx+patch_size]
             patch_mean = np.mean(patch)
-            patch = np.ravel(patch) - patch_mean
+            patch = patch.flatten() - patch_mean
             patch_norm = np.sqrt(np.sum(patch*patch))
             
             feature = img_lr_y_feature[yy:yy+patch_size, xx:xx+patch_size, :]
-            feature = np.ravel(feature)
+            feature = feature.flatten()
             feature_norm = np.sqrt(np.sum(feature*feature))
             
             if feature_norm>1:
@@ -219,7 +277,8 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
             else:
                 y = feature
                 
-            b = np.dot(-Dl.T,y)
+            b = np.zeros([1,Dl.shape[1]])-np.dot(Dl.T,y)
+            b = b.T
             
             # sparse recovery
             w = sparse_solution(lmbd, A, b)
@@ -259,12 +318,12 @@ def backprojection(sr, lr, iters, nu, c):
     
     for i in range(iters):
         sr_blur = convolve2d(sr, p, 'same')
-        sr_downscale = resize(sr_blur, lr.shape, 'bicubic')
+        sr_downscale = imresize(sr_blur, output_shape = lr.shape, method = 'bicubic')
         diff = lr - sr_downscale
 
-        diff_upscale = resize(diff, sr.shape, 'bicubic')
+        diff_upscale = imresize(diff, output_shape = sr_0.shape, method = 'bicubic')
         diff_blur = convolve2d(diff_upscale, p, 'same')
         
         sr = sr + nu*(diff_blur + c*(sr_0-sr))
         
-    return sr
+    return sr.astype(np.uint8)
