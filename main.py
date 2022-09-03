@@ -44,8 +44,8 @@ with open('dictionary/Dh_' + dict_name + '.pkl', 'rb') as f:
     Dh = pickle.load(f)
 with open('dictionary/Dl_' + dict_name + '.pkl', 'rb') as f:
     Dl = pickle.load(f)
+    
 # import scipy.io as scio
- 
 # dataFile = './dictionary/D_512_0.15_5.mat'
 # data = scio.loadmat(dataFile)
 # Dh = data['Dh']
@@ -85,13 +85,11 @@ for i in range(len(img_lr_file)):
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    #img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
-    img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
+    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
+    #img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
     
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
-    #img_sr_y = back(img_sr_y, img_lr_y, para.max_iteration)
 
-    
     # reconstructed color images
     if para.color_space == 'ycbcr':
         img_sr = np.stack((img_sr_y, img_sr_cb, img_sr_cr), axis=2)
