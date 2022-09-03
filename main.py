@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import skimage.io as io
 from skimage.color import rgb2ycbcr,ycbcr2rgb,rgb2gray
 from skimage.transform import resize
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity, mean_squared_error
@@ -13,9 +14,9 @@ import pickle
 # %%
 # choose parameters
 class args(object):
-    lr_dir = 'data/try_lr'
-    sr_dir = 'result/try_sr'
-    hr_dir = 'data/try_hr'
+    lr_dir = 'data/set5_lr'
+    sr_dir = 'result/set5_sr'
+    hr_dir = 'data/set5_hr'
     
     # choose a dictionary for SR
     dic_upscale_factor = 2
@@ -25,9 +26,9 @@ class args(object):
     
     # sparse SR factor
     lambda_factor = 0.2
-    overlap = 4
+    overlap = 1
     upscale_factor = 2
-    max_iteration = 100
+    max_iteration = 10
     nu = 1
     beta = 1 # also c/gamma in paper
     color_space = 'ycbcr' # 'bw'
@@ -38,18 +39,18 @@ class args(object):
 para = args()
 # %%
 # load dictionary
-# dict_name = str(para.dic_size) + '_US' + str(para.dic_upscale_factor) + '_L' + str(para.dic_lambda) + '_PS' + str(para.dic_patch_size)
+dict_name = str(para.dic_size) + '_US' + str(para.dic_upscale_factor) + '_L' + str(para.dic_lambda) + '_PS' + str(para.dic_patch_size)
 
-# with open('dictionary/Dh_' + dict_name + '.pkl', 'rb') as f:
-#     Dh = pickle.load(f)
-# with open('dictionary/Dl_' + dict_name + '.pkl', 'rb') as f:
-#     Dl = pickle.load(f)
-import scipy.io as scio
+with open('dictionary/Dh_' + dict_name + '.pkl', 'rb') as f:
+    Dh = pickle.load(f)
+with open('dictionary/Dl_' + dict_name + '.pkl', 'rb') as f:
+    Dl = pickle.load(f)
+# import scipy.io as scio
  
-dataFile = './dictionary/D_512_0.15_5.mat'
-data = scio.loadmat(dataFile)
-Dh = data['Dh']
-Dl = data['Dl']
+# dataFile = './dictionary/D_512_0.15_5.mat'
+# data = scio.loadmat(dataFile)
+# Dh = data['Dh']
+# Dl = data['Dl']
 # %%
 # super resolution img dir
 if not os.path.exists(para.sr_dir):
@@ -59,8 +60,8 @@ img_lr_file = os.listdir(para.lr_dir)
 # %%
 for i in range(len(img_lr_file)):
     img_name = img_lr_file[i]
-    img_lr = plt.imread(f"{para.lr_dir}/{img_name}")
-    img_hr = plt.imread(f"{para.hr_dir}/{img_name}")
+    img_lr = io.imread(f"{para.lr_dir}/{img_name}")
+    img_hr = io.imread(f"{para.hr_dir}/{img_name}")
     
     if para.color_space == 'ycbcr':
         img_hr_y = rgb2ycbcr(img_hr)[:,:,0].astype(np.uint8)
@@ -85,8 +86,8 @@ for i in range(len(img_lr_file)):
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
-    #img_sr_y = unknown(img_lr_y, img_hr_y.shape, para.overlap)
+    #img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
+    img_sr_y = unknown(img_lr_y, img_hr_y.shape, para.overlap)
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
     
     # reconstructed color images
@@ -113,6 +114,7 @@ for i in range(len(img_lr_file)):
     # bicubic interpolation for reference
     img_bc = resize(img_lr, img_hr_y.shape, 3, preserve_range= True).astype(np.uint8)
     img_bc_y = rgb2ycbcr(img_bc)[:, :, 0].astype(np.uint8)
+    
     
     # calculate PSNR, SSIM and MSE for the luminance
     # for bicubic interpolation
