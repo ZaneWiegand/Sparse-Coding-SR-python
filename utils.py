@@ -273,23 +273,23 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap, maxiter):
             patch = patch.flatten() - patch_mean
             patch_norm = np.sqrt(np.sum(patch*patch))
             
-            # feature = img_lr_y_feature[yy:yy+patch_size, xx:xx+patch_size, :]
-            # feature = feature.flatten()
-            # feature_norm = np.sqrt(np.sum(feature*feature))
+            feature = img_lr_y_feature[yy:yy+patch_size, xx:xx+patch_size, :]
+            feature = feature.flatten()
+            feature_norm = np.sqrt(np.sum(feature*feature))
             
-            # if feature_norm>1:
-            #     y = feature/feature_norm
-            # else:
-            #     y = feature
+            if feature_norm>1:
+                y = feature/feature_norm
+            else:
+                y = feature
                 
-            # b = np.zeros([1,Dl.shape[1]])-np.dot(Dl.T,y)
-            # b = b.T
+            b = np.zeros([1,Dl.shape[1]])-np.dot(Dl.T,y)
+            b = b.T
 
             # sparse recovery
-            # w = sparse_solution(lmbd, A, b, maxiter)
+            w = sparse_solution(lmbd, A, b, maxiter)
             
             # generate hr patch and scale the contrast
-            # h_patch = np.dot(Dh,w)
+            h_patch = np.dot(Dh,w)
             
             h_patch = np.zeros(patch.shape)
             h_patch = lin_scale(h_patch, patch_norm)
