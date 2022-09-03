@@ -326,7 +326,7 @@ def backprojection(sr, lr, iters, nu, c):
     
     for i in range(iters):
         #sr_blur = convolve2d(sr, p, 'same')
-        sr_downscale = resize(sr, lr.shape, anti_aliasing=1)
+        sr_downscale = resize(sr, lr.shape)
         diff = lr - sr_downscale
 
         diff_upscale = resize(diff, sr_0.shape)
