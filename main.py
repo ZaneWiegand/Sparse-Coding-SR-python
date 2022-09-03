@@ -9,7 +9,6 @@ from skimage.metrics import peak_signal_noise_ratio, structural_similarity, mean
 from utils import noise_quality_measure
 
 from utils import scsr,backprojection
-from ScSR import unknown
 import pickle
 # %%
 # choose parameters
@@ -28,9 +27,9 @@ class args(object):
     lambda_factor = 0.2
     overlap = 1
     upscale_factor = 2
-    max_iteration = 10
+    max_iteration = 100
     nu = 1
-    beta = 1 # also c/gamma in paper
+    beta = 0 # also c/gamma in paper
     color_space = 'ycbcr' # 'bw'
     
     # True for validation, False for prediction
@@ -64,7 +63,7 @@ for i in range(len(img_lr_file)):
     img_hr = io.imread(f"{para.hr_dir}/{img_name}")
     
     if para.color_space == 'ycbcr':
-        img_hr_y = rgb2ycbcr(img_hr)[:,:,0].astype(np.uint8)
+        img_hr_y = rgb2ycbcr(img_hr)[:,:,0]
         
         # change color space
         img_lr_ycbcr = rgb2ycbcr(img_lr)
@@ -74,8 +73,8 @@ for i in range(len(img_lr_file)):
         
         # upscale chrominance to color SR images
         # nearest neighbor interpolation
-        img_sr_cb = resize(img_lr_cb, img_hr_y.shape, 3, preserve_range = True)
-        img_sr_cr = resize(img_lr_cr, img_hr_y.shape, 3, preserve_range = True)
+        img_sr_cb = resize(img_lr_cb, img_hr_y.shape, 0)
+        img_sr_cr = resize(img_lr_cr, img_hr_y.shape, 0)
         
     elif para.color_space == 'bw':
         img_hr_y = rgb2gray(img_hr)
@@ -87,8 +86,12 @@ for i in range(len(img_lr_file)):
     # super resolution via sparse representation
     # TODO ScSR, backprojection
     #img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
-    img_sr_y = unknown(img_lr_y, img_hr_y.shape, para.overlap)
+    #img_sr_y = unknown(img_lr_y, img_hr_y.shape, para.overlap)
+    
+    img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
+    #img_sr_y = back(img_sr_y, img_lr_y, para.max_iteration)
+
     
     # reconstructed color images
     if para.color_space == 'ycbcr':
@@ -101,22 +104,19 @@ for i in range(len(img_lr_file)):
     else:
         raise ValueError("Invalid color space!")
 
-    # signal normalization
-    # for channel in range(img_sr.shape[2]):
-    #     ratio = np.mean(img_lr[:, :, channel]) / (np.mean(img_sr[:, :, channel]) * 255)
-    #     img_sr[:, :, channel] = img_sr[:, :, channel] * ratio
-
     # # pixel intensity normalization
     img_sr = img_sr.clip(0,1)*255
     img_sr = img_sr.astype(np.uint8)
-    img_sr_y = img_sr_y.astype(np.uint8)
     
     # bicubic interpolation for reference
-    img_bc = resize(img_lr, img_hr_y.shape, 3, preserve_range= True).astype(np.uint8)
-    img_bc_y = rgb2ycbcr(img_bc)[:, :, 0].astype(np.uint8)
-    
+    img_bc = resize(img_lr, img_hr_y.shape, 3).clip(0,1)*255
+    img_bc = img_bc.astype(np.uint8)
+    img_bc_y = rgb2ycbcr(img_bc)[:, :, 0]
     
     # calculate PSNR, SSIM and MSE for the luminance
+    img_hr_y = img_hr_y.astype(np.uint8)
+    img_bc_y = img_bc_y.astype(np.uint8)
+    img_sr_y = img_sr_y.astype(np.uint8)
     # for bicubic interpolation
     psnr_bc_hr = peak_signal_noise_ratio(img_hr_y,img_bc_y)
     ssim_bc_hr = structural_similarity(img_hr_y,img_bc_y)
@@ -136,6 +136,7 @@ for i in range(len(img_lr_file)):
     
     plt.figure()
     plt.subplot(1,2,1)
-    plt.imshow(img_sr)
-    plt.subplot(1,2,2)
     plt.imshow(img_bc)
+    plt.subplot(1,2,2)
+    plt.imshow(img_sr)
+    plt.show()

@@ -243,7 +243,7 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap, maxiter):
     
     
     # bicubic interpolation of the lr image
-    img_lr_y_upscale = resize(img_lr_y, np.multiply(upscale_factor, img_lr_y.shape) ,3).astype(np.uint8)
+    img_lr_y_upscale = resize(img_lr_y, np.multiply(upscale_factor, img_lr_y.shape))
     # img_lr_y_upscale = img_lr_y_upscale.
     
     img_sr_y_height,img_sr_y_width = img_lr_y_upscale.shape
@@ -273,31 +273,34 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap, maxiter):
             patch = patch.flatten() - patch_mean
             patch_norm = np.sqrt(np.sum(patch*patch))
             
-            feature = img_lr_y_feature[yy:yy+patch_size, xx:xx+patch_size, :]
-            feature = feature.flatten()
-            feature_norm = np.sqrt(np.sum(feature*feature))
+            # feature = img_lr_y_feature[yy:yy+patch_size, xx:xx+patch_size, :]
+            # feature = feature.flatten()
+            # feature_norm = np.sqrt(np.sum(feature*feature))
             
-            if feature_norm>1:
-                y = feature/feature_norm
-            else:
-                y = feature
+            # if feature_norm>1:
+            #     y = feature/feature_norm
+            # else:
+            #     y = feature
                 
-            b = np.zeros([1,Dl.shape[1]])-np.dot(Dl.T,y)
-            b = b.T
-            
+            # b = np.zeros([1,Dl.shape[1]])-np.dot(Dl.T,y)
+            # b = b.T
+
             # sparse recovery
-            w = sparse_solution(lmbd, A, b, maxiter)
+            # w = sparse_solution(lmbd, A, b, maxiter)
             
             # generate hr patch and scale the contrast
-            h_patch = np.dot(Dh,w)
+            # h_patch = np.dot(Dh,w)
+            
+            h_patch = np.zeros(patch.shape)
             h_patch = lin_scale(h_patch, patch_norm)
+            
             h_patch = np.reshape(h_patch,[patch_size,patch_size])
             h_patch = h_patch+patch_mean
             
-            img_sr_y[yy:yy+patch_size, xx:xx+patch_size] = img_sr_y[yy:yy+patch_size, xx:xx+patch_size] + h_patch
-            cnt_matrix[yy:yy+patch_size, xx:xx+patch_size] = cnt_matrix[yy:yy+patch_size, xx:xx+patch_size] + 1
+            img_sr_y[yy:yy+patch_size, xx:xx+patch_size] += h_patch
+            cnt_matrix[yy:yy+patch_size, xx:xx+patch_size] += 1
 
-    idx = np.where(cnt_matrix < 1)
+    idx = np.where(cnt_matrix < 1)[0]
     img_sr_y[idx] = img_lr_y_upscale[idx]
 
     cnt_matrix[idx] = 1
@@ -322,11 +325,11 @@ def backprojection(sr, lr, iters, nu, c):
     sr_0 = sr
     
     for i in range(iters):
-        sr_blur = convolve2d(sr, p, 'same')
-        sr_downscale = resize(sr_blur, lr.shape, 3)
+        #sr_blur = convolve2d(sr, p, 'same')
+        sr_downscale = resize(sr, lr.shape, anti_aliasing=1)
         diff = lr - sr_downscale
 
-        diff_upscale = resize(diff, sr_0.shape, 3)
+        diff_upscale = resize(diff, sr_0.shape)
         diff_blur = convolve2d(diff_upscale, p, 'same')
         
         sr = sr + nu*(diff_blur + c*(sr_0-sr))
