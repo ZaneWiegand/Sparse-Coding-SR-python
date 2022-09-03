@@ -85,10 +85,9 @@ for i in range(len(img_lr_file)):
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    #img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
-    #img_sr_y = unknown(img_lr_y, img_hr_y.shape, para.overlap)
+    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
+    #img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
     
-    img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
     #img_sr_y = back(img_sr_y, img_lr_y, para.max_iteration)
 

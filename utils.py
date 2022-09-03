@@ -291,7 +291,7 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap, maxiter):
             # generate hr patch and scale the contrast
             h_patch = np.dot(Dh,w)
             
-            h_patch = np.zeros(patch.shape)
+            # h_patch = np.zeros(patch.shape)
             h_patch = lin_scale(h_patch, patch_norm)
             
             h_patch = np.reshape(h_patch,[patch_size,patch_size])
