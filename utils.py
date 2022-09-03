@@ -5,7 +5,7 @@ from numpy.fft import fftshift, fft2, ifft2
 from sklearn.preprocessing import normalize
 from scipy.signal import convolve2d
 from tqdm import tqdm
-from imresize import imresize
+from skimage.transform import resize
 # %%
 
 def noise_quality_measure(hr, sr, VA=np.pi/3):
@@ -166,7 +166,7 @@ def lin_scale(h_img, l_norm):
     return h_img
 
 # todo
-def sparse_solution(lmbd, A, b):
+def sparse_solution(lmbd, A, b, maxiter):
     
     eps = 1e-9
     x = np.zeros((A.shape[0], 1))
@@ -203,7 +203,7 @@ def sparse_solution(lmbd, A, b):
             s = np.where(xa*x_new <= 0)[0]
             
             cnt_2 += 1
-            if np.all(s == 0) or cnt_2>=10:
+            if np.all(s == 0) or cnt_2>=maxiter:
                 x[a] = x_new
                 cnt_2 = 0
                 break
@@ -230,11 +230,11 @@ def sparse_solution(lmbd, A, b):
         mi = np.argmax(np.abs(temp))
         
         cnt_1 += 1
-        if ma<=lmbd+eps or cnt_1>=10:
+        if ma<=lmbd+eps or cnt_1>=maxiter:
             break
     return x
 
-def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
+def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap, maxiter):
     # sparse coding super resolution
     
     # normalize the dictionary
@@ -243,7 +243,7 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
     
     
     # bicubic interpolation of the lr image
-    img_lr_y_upscale = np.round(imresize(img_lr_y, upscale_factor,'bicubic'))
+    img_lr_y_upscale = resize(img_lr_y, np.multiply(upscale_factor, img_lr_y.shape) ,3).astype(np.uint8)
     # img_lr_y_upscale = img_lr_y_upscale.
     
     img_sr_y_height,img_sr_y_width = img_lr_y_upscale.shape
@@ -286,7 +286,7 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
             b = b.T
             
             # sparse recovery
-            w = sparse_solution(lmbd, A, b)
+            w = sparse_solution(lmbd, A, b, maxiter)
             
             # generate hr patch and scale the contrast
             h_patch = np.dot(Dh,w)
@@ -303,7 +303,7 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
     cnt_matrix[idx] = 1
     img_sr_y = img_sr_y/cnt_matrix
     
-    return img_sr_y.astype(np.uint8)
+    return img_sr_y
 
 # %%
 def gauss2D(size,sigma):
@@ -323,12 +323,12 @@ def backprojection(sr, lr, iters, nu, c):
     
     for i in range(iters):
         sr_blur = convolve2d(sr, p, 'same')
-        sr_downscale = imresize(sr_blur, output_shape = lr.shape, method = 'bicubic')
+        sr_downscale = resize(sr_blur, lr.shape, 3)
         diff = lr - sr_downscale
 
-        diff_upscale = imresize(diff, output_shape = sr_0.shape, method = 'bicubic')
+        diff_upscale = resize(diff, sr_0.shape, 3)
         diff_blur = convolve2d(diff_upscale, p, 'same')
         
         sr = sr + nu*(diff_blur + c*(sr_0-sr))
         
-    return sr.astype(np.uint8)
+    return sr

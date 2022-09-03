@@ -3,7 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.color import rgb2ycbcr,ycbcr2rgb,rgb2gray
-from imresize import imresize
+from skimage.transform import resize
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity, mean_squared_error
 from utils import noise_quality_measure
 
@@ -67,14 +67,14 @@ for i in range(len(img_lr_file)):
         
         # change color space
         img_lr_ycbcr = rgb2ycbcr(img_lr)
-        img_lr_y = np.round(img_lr_ycbcr[:,:,0])
-        img_lr_cb = np.round(img_lr_ycbcr[:,:,1])
-        img_lr_cr = np.round(img_lr_ycbcr[:,:,2])
+        img_lr_y = img_lr_ycbcr[:,:,0]
+        img_lr_cb = img_lr_ycbcr[:,:,1]
+        img_lr_cr = img_lr_ycbcr[:,:,2]
         
         # upscale chrominance to color SR images
         # nearest neighbor interpolation
-        img_sr_cb = imresize(img_lr_cb, para.upscale_factor, 'bicubic')
-        img_sr_cr = imresize(img_lr_cr, para.upscale_factor, 'bicubic')
+        img_sr_cb = resize(img_lr_cb, img_hr_y.shape, 3, preserve_range = True)
+        img_sr_cr = resize(img_lr_cr, img_hr_y.shape, 3, preserve_range = True)
         
     elif para.color_space == 'bw':
         img_hr_y = rgb2gray(img_hr)
@@ -85,7 +85,7 @@ for i in range(len(img_lr_file)):
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap)
+    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
     #img_sr_y = unknown(img_lr_y, img_hr_y.shape, para.overlap)
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
     
@@ -108,10 +108,10 @@ for i in range(len(img_lr_file)):
     # # pixel intensity normalization
     img_sr = img_sr.clip(0,1)*255
     img_sr = img_sr.astype(np.uint8)
+    img_sr_y = img_sr_y.astype(np.uint8)
     
     # bicubic interpolation for reference
-    img_bc = imresize(img_lr,para.upscale_factor, 'bicubic')
-    img_bc = img_bc.astype(np.uint8)
+    img_bc = resize(img_lr, img_hr_y.shape, 3, preserve_range= True).astype(np.uint8)
     img_bc_y = rgb2ycbcr(img_bc)[:, :, 0].astype(np.uint8)
     
     # calculate PSNR, SSIM and MSE for the luminance
@@ -137,4 +137,3 @@ for i in range(len(img_lr_file)):
     plt.imshow(img_sr)
     plt.subplot(1,2,2)
     plt.imshow(img_bc)
-# %%
