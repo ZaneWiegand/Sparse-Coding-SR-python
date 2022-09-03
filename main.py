@@ -24,8 +24,8 @@ class args(object):
     dic_patch_size = 3
     
     # sparse SR factor
-    lambda_factor = 0.2
-    overlap = 1
+    lambda_factor = 0.1
+    overlap = 2
     upscale_factor = 2
     max_iteration = 100
     nu = 1
@@ -85,8 +85,8 @@ for i in range(len(img_lr_file)):
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
-    #img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
+    #img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
+    img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
     
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
     #img_sr_y = back(img_sr_y, img_lr_y, para.max_iteration)
