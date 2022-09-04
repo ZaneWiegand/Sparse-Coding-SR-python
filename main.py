@@ -13,9 +13,9 @@ import pickle
 # %%
 # choose parameters
 class args(object):
-    lr_dir = 'data/set5_lr'
-    sr_dir = 'result/set5_sr'
-    hr_dir = 'data/set5_hr'
+    lr_dir = 'data/try_lr'
+    sr_dir = 'result/try_sr'
+    hr_dir = 'data/try_hr'
     
     # choose a dictionary for SR
     dic_upscale_factor = 2
@@ -24,10 +24,10 @@ class args(object):
     dic_patch_size = 3
     
     # sparse SR factor
-    lambda_factor = 0.1
-    overlap = 2
+    lambda_factor = 0.6
+    overlap = 1
     upscale_factor = 2
-    max_iteration = 100
+    max_iteration = 50
     nu = 1
     beta = 0 # also c/gamma in paper
     color_space = 'ycbcr' # 'bw'
@@ -44,12 +44,6 @@ with open('dictionary/Dh_' + dict_name + '.pkl', 'rb') as f:
     Dh = pickle.load(f)
 with open('dictionary/Dl_' + dict_name + '.pkl', 'rb') as f:
     Dl = pickle.load(f)
-    
-# import scipy.io as scio
-# dataFile = './dictionary/D_512_0.15_5.mat'
-# data = scio.loadmat(dataFile)
-# Dh = data['Dh']
-# Dl = data['Dl']
 # %%
 # super resolution img dir
 if not os.path.exists(para.sr_dir):
@@ -57,6 +51,7 @@ if not os.path.exists(para.sr_dir):
 # %%
 img_lr_file = os.listdir(para.lr_dir)
 # %%
+# TODO -------------------------------------------------------------------
 for i in range(len(img_lr_file)):
     img_name = img_lr_file[i]
     img_lr = io.imread(f"{para.lr_dir}/{img_name}")
@@ -85,7 +80,7 @@ for i in range(len(img_lr_file)):
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
+    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap)
     #img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
     
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
@@ -137,3 +132,4 @@ for i in range(len(img_lr_file)):
     plt.subplot(1,2,2)
     plt.imshow(img_sr)
     plt.show()
+# %%

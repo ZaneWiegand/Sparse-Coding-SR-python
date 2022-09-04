@@ -166,7 +166,7 @@ def lin_scale(h_img, l_norm):
     return h_img
 
 # todo
-def sparse_solution(lmbd, A, b, maxiter):
+def sparse_solution(lmbd, A, b):
     
     eps = 1e-9
     x = np.zeros((A.shape[0], 1))
@@ -203,7 +203,7 @@ def sparse_solution(lmbd, A, b, maxiter):
             s = np.where(xa*x_new <= 0)[0]
             
             cnt_2 += 1
-            if np.all(s == 0) or cnt_2>=maxiter:
+            if np.all(s == 0):
                 x[a] = x_new
                 cnt_2 = 0
                 break
@@ -230,21 +230,19 @@ def sparse_solution(lmbd, A, b, maxiter):
         mi = np.argmax(np.abs(temp))
         
         cnt_1 += 1
-        if ma<=lmbd+eps or cnt_1>=maxiter:
+        if ma<=lmbd+eps:
             break
     return x
 
-def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap, maxiter):
+def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
     # sparse coding super resolution
     
     # normalize the dictionary
-    Dl = normalize(Dl,axis=0) #? normalize?
+    Dl = normalize(Dl,axis=0) #? normalize?  
     patch_size = int(np.sqrt(Dh.shape[0]))
-    
-    
+       
     # bicubic interpolation of the lr image
-    img_lr_y_upscale = resize(img_lr_y, np.multiply(upscale_factor, img_lr_y.shape))
-    # img_lr_y_upscale = img_lr_y_upscale.
+    img_lr_y_upscale = resize(img_lr_y, np.multiply(upscale_factor, img_lr_y.shape), 3, preserve_range = True)
     
     img_sr_y_height,img_sr_y_width = img_lr_y_upscale.shape
     img_sr_y = np.zeros(img_lr_y_upscale.shape)
@@ -286,7 +284,7 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap, maxiter):
             b = b.T
 
             # sparse recovery
-            w = sparse_solution(lmbd, A, b, maxiter)
+            w = sparse_solution(lmbd, A, b)
             
             # generate hr patch and scale the contrast
             h_patch = np.dot(Dh,w)
