@@ -1,13 +1,15 @@
 # %%
+from os import listdir
 from copy import deepcopy
 import numpy as np
 from numpy.fft import fftshift, fft2, ifft2
 from sklearn.preprocessing import normalize
 from scipy.signal import convolve2d
 from tqdm import tqdm
-from skimage.transform import resize
+from skimage.transform import resize,rescale
+from skimage.color import rgb2gray
+import skimage.io as io
 # %%
-
 def noise_quality_measure(hr, sr, VA=np.pi/3):
     # metrics: noise quality measure 
 
@@ -140,6 +142,7 @@ def noise_quality_measure(hr, sr, VA=np.pi/3):
     B = np.sum(square_err)
     nqm_value = 10*np.log10(A/B)
     return nqm_value
+
 # %%
 def extract_feature(img):
     row, col = img.shape
@@ -166,7 +169,7 @@ def lin_scale(h_img, l_norm):
     return h_img
 
 # todo
-def sparse_solution(lmbd, A, b):
+def sparse_solution(lmbd, A, b, maxiter):
     
     eps = 1e-9
     x = np.zeros((A.shape[0], 1))
@@ -203,7 +206,7 @@ def sparse_solution(lmbd, A, b):
             s = np.where(xa*x_new <= 0)[0]
             
             cnt_2 += 1
-            if np.all(s == 0):
+            if np.all(s == 0) or cnt_2>maxiter:
                 x[a] = x_new
                 cnt_2 = 0
                 break
@@ -230,11 +233,11 @@ def sparse_solution(lmbd, A, b):
         mi = np.argmax(np.abs(temp))
         
         cnt_1 += 1
-        if ma<=lmbd+eps:
+        if ma<=lmbd+eps or cnt_1>maxiter:
             break
     return x
 
-def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
+def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap, maxiter):
     # sparse coding super resolution
     
     # normalize the dictionary
@@ -268,23 +271,23 @@ def scsr(img_lr_y, upscale_factor, Dh, Dl, lmbd, overlap):
             
             patch = img_lr_y_upscale[yy:yy+patch_size, xx:xx+patch_size]
             patch_mean = np.mean(patch)
-            patch = patch.flatten() - patch_mean
+            patch = np.ravel(patch,'F') - patch_mean
             patch_norm = np.sqrt(np.sum(patch*patch))
             
             feature = img_lr_y_feature[yy:yy+patch_size, xx:xx+patch_size, :]
-            feature = feature.flatten()
+            feature = np.ravel(feature,'F')
             feature_norm = np.sqrt(np.sum(feature*feature))
             
             if feature_norm>1:
-                y = feature/feature_norm
-            else:
-                y = feature
+                feature = feature/feature_norm
+            
+            y = feature
                 
             b = np.zeros([1,Dl.shape[1]])-np.dot(Dl.T,y)
             b = b.T
 
             # sparse recovery
-            w = sparse_solution(lmbd, A, b)
+            w = sparse_solution(lmbd, A, b, maxiter)
             
             # generate hr patch and scale the contrast
             h_patch = np.dot(Dh,w)
@@ -333,3 +336,97 @@ def backprojection(sr, lr, iters, nu, c):
         sr = sr + nu*(diff_blur + c*(sr_0-sr))
         
     return sr
+
+# %%
+def random_sample_patch(img_path, patch_size, num_patch, upscale_factor):
+    img_dir = listdir(img_path)
+
+    img_num = len(img_dir)
+    nper_img = np.zeros((img_num, 1))
+
+    for i in tqdm(range(img_num)):
+        img = io.imread('{}{}'.format(img_path, img_dir[i]))
+        nper_img[i] = img.shape[0] * img.shape[1]
+    
+    nper_img = np.floor(nper_img * num_patch/np.sum(nper_img))
+    
+    for i in tqdm(range(img_num)):
+        patch_num = int(nper_img[i])
+        img = io.imread('{}{}'.format(img_path, img_dir[i]))
+        H, L = sample_patches(img, patch_size, patch_num, upscale_factor)
+        if i == 0:
+            Xh = H
+            Xl = L
+        else:
+            Xh = np.concatenate((Xh, H), axis=1)
+            Xl = np.concatenate((Xl, L), axis=1)
+    return Xh, Xl
+
+def sample_patches(img, patch_size, patch_num, upscale_factor):
+    if len(img.shape) == 3:
+        hIm = (rgb2gray(img)*255).astype(np.uint8)
+    else:
+        hIm = img
+
+    # Generate low resolution patches
+    lIm = rescale(hIm, 1/upscale_factor, 3, preserve_range = True)
+    lIm = resize(lIm, hIm.shape, 3, preserve_range = True)
+    # lIm = lIm.astype(np.uint8)
+    nrow, ncol = hIm.shape
+    
+    x = np.random.permutation(range(nrow - 2*patch_size)) + patch_size
+    y = np.random.permutation(range(ncol - 2*patch_size)) + patch_size
+    
+    X,Y = np.meshgrid(x,y)
+    xrow = np.ravel(X,'F')
+    ycol = np.ravel(Y,'F')
+    
+    if patch_num<len(xrow):
+        xrow = xrow[0:patch_num]
+        ycol = ycol[0:patch_num]
+        
+    patch_num = len(xrow)
+    HP = np.zeros([patch_size**2, patch_num])
+    LP = np.zeros([4*patch_size**2, patch_num])
+    
+    hf1 = np.array([[-1, 0, 1]])
+    vf1 = hf1.T
+    lImG11 = convolve2d(lIm, hf1, 'same')
+    lImG12 = convolve2d(lIm, vf1, 'same')
+    
+    hf2 = np.array([[1, 0, -2, 0, 1]])
+    vf2 = hf2.T
+    lImG21 = convolve2d(lIm, hf2, 'same')
+    lImG22 = convolve2d(lIm, vf2, 'same')
+    
+    for i in tqdm(range(patch_num)):
+        row = xrow[i]
+        col = ycol[i]
+        
+        Hpatch = np.ravel(hIm[row : row + patch_size, col : col + patch_size],'F')
+        
+        Lpatch1 = np.ravel(lImG11[row : row + patch_size, col : col + patch_size],'F')
+        Lpatch1 = np.reshape(Lpatch1, (Lpatch1.shape[0], 1))
+        Lpatch2 = np.ravel(lImG12[row : row + patch_size, col : col + patch_size],'F')
+        Lpatch2 = np.reshape(Lpatch2, (Lpatch2.shape[0], 1))
+        Lpatch3 = np.ravel(lImG21[row : row + patch_size, col : col + patch_size],'F')
+        Lpatch3 = np.reshape(Lpatch3, (Lpatch3.shape[0], 1))
+        Lpatch4 = np.ravel(lImG22[row : row + patch_size, col : col + patch_size],'F')
+        Lpatch4 = np.reshape(Lpatch4, (Lpatch4.shape[0], 1))
+        
+        Lpatch = np.concatenate((Lpatch1,Lpatch2,Lpatch3,Lpatch4), axis = 1)
+        Lpatch = np.ravel(Lpatch,'F')
+        
+        HP[:,i] = Hpatch - np.mean(Hpatch)
+        LP[:,i] = Lpatch
+        
+    return HP, LP
+# %%
+def patch_pruning(Xh, Xl, per):
+    pvars = np.var(Xh, axis=0)
+    threshold = np.percentile(pvars, per)
+    idx = pvars > threshold
+    # print(pvars)
+    Xh = Xh[:, idx]
+    Xl = Xl[:, idx]
+    return Xh, Xl

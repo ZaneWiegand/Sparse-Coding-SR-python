@@ -72,24 +72,27 @@ def sparse_solution(lmbd, A, b, maxiter):
             break
     return x
 # %%
-import scipy.io as scio
-dataFile = 'demo.mat'
-data = scio.loadmat(dataFile)
-A = data['A']
-b = data['b']
-lmbd = data['lambda']
-ans = data['w']
+# import scipy.io as scio
+# dataFile = 'demo.mat'
+# data = scio.loadmat(dataFile)
+# A = data['A']
+# b = data['b']
+# lmbd = data['lambda']
+# ans = data['w']
+# # %%
+# cal = sparse_solution(lmbd, A, b, 1000)
+# # %%
+# all(ans - cal < 1e10-22)
+# # %%
+# import scipy.io as scio
+# dataFile = './dictionary/D_512_0.15_5.mat'
+# data = scio.loadmat(dataFile)
+# Dh = data['Dh']
+# Dl = data['Dl']
+# # %%
+# from sklearn.preprocessing import normalize
+# Dl = normalize(Dl,axis=0)
 # %%
-cal = sparse_solution(lmbd, A, b, 1000)
-# %%
-all(ans - cal < 1e10-22)
-# %%
-import scipy.io as scio
-dataFile = './dictionary/D_512_0.15_5.mat'
-data = scio.loadmat(dataFile)
-Dh = data['Dh']
-Dl = data['Dl']
-# %%
-from sklearn.preprocessing import normalize
-Dl = normalize(Dl,axis=0)
-# %%
+A = io.imread('./data/T91/tt1.png')
+nrow, ncol, ndim = A.shape
+patch_size = 5

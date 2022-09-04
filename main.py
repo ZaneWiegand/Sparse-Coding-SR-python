@@ -20,12 +20,12 @@ class args(object):
     # choose a dictionary for SR
     dic_upscale_factor = 2
     dic_lambda = 0.1
-    dic_size = 1024
-    dic_patch_size = 3
+    dic_size = 512
+    dic_patch_size = 5
     
     # sparse SR factor
-    lambda_factor = 0.6
-    overlap = 1
+    lambda_factor = 0.5
+    overlap = 4
     upscale_factor = 2
     max_iteration = 50
     nu = 1
@@ -44,6 +44,13 @@ with open('dictionary/Dh_' + dict_name + '.pkl', 'rb') as f:
     Dh = pickle.load(f)
 with open('dictionary/Dl_' + dict_name + '.pkl', 'rb') as f:
     Dl = pickle.load(f)
+    
+# import scipy.io as scio
+ 
+# dataFile = './dictionary/D_512_0.15_5.mat'
+# data = scio.loadmat(dataFile)
+# Dh = data['Dh']
+# Dl = data['Dl']
 # %%
 # super resolution img dir
 if not os.path.exists(para.sr_dir):
@@ -72,15 +79,15 @@ for i in range(len(img_lr_file)):
         img_sr_cr = resize(img_lr_cr, img_hr_y.shape, 0)
         
     elif para.color_space == 'bw':
-        img_hr_y = rgb2gray(img_hr)
-        img_lr_y = rgb2gray(img_lr)
+        img_hr_y = (rgb2gray(img_hr)*255).astype(np.uint8)
+        img_lr_y = (rgb2gray(img_lr)*255).astype(np.uint8)
     
     else:
         raise ValueError("Invalid color space!")
         
     # super resolution via sparse representation
     # TODO ScSR, backprojection
-    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap)
+    img_sr_y = scsr(img_lr_y, para.upscale_factor, Dh, Dl, para.lambda_factor, para.overlap, para.max_iteration)
     #img_sr_y = resize(img_lr_y, np.multiply(para.upscale_factor, img_lr_y.shape))
     
     img_sr_y = backprojection(img_sr_y, img_lr_y, para.max_iteration, para.nu, para.beta)
